@@ -273,7 +273,6 @@ func GzipHandlerWithOpts(opts ...option) (func(http.Handler) http.Handler, error
 		index := poolIndex(c.level)
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Add(vary, acceptEncoding)
 			if acceptsGzip(r) {
 				gw := &GzipResponseWriter{
 					ResponseWriter: w,
@@ -293,6 +292,7 @@ func GzipHandlerWithOpts(opts ...option) (func(http.Handler) http.Handler, error
 			} else {
 				h.ServeHTTP(w, r)
 			}
+			addAcceptEncodingToVary(w.Header())
 		})
 	}, nil
 }
@@ -402,6 +402,17 @@ func GzipHandler(h http.Handler) http.Handler {
 func acceptsGzip(r *http.Request) bool {
 	acceptedEncodings, _ := parseEncodings(r.Header.Get(acceptEncoding))
 	return acceptedEncodings["gzip"] > 0.0
+}
+
+// addAcceptEncodingToVary makes sure that the Vary header contains Accept-Encoding,
+// but does not remove any other headers
+func addAcceptEncodingToVary(hdr http.Header) {
+	vhdr := strings.TrimSpace(hdr.Get(vary))
+	if vhdr == "" {
+		hdr.Set(vary, acceptEncoding)
+	} else if strings.Contains(vhdr, acceptEncoding) == false {
+		hdr.Set(vary, vhdr+", "+acceptEncoding)
+	}
 }
 
 // returns true if we've been configured to compress the specific content type.
